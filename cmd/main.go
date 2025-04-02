@@ -10,7 +10,10 @@ import (
 	"encoding/json"
 
 	"github.com/joho/godotenv"
+	"github.com/lukinkratas/cli-t212-to-digrin-go/pkg/awsutils"
 )
+
+const bucketName string = "t212-to-digrin"
 
 type Payload struct {
 	DataIncluded map[string]bool `json:"dataIncluded"`
@@ -33,50 +36,50 @@ type Report struct {
 
 func GetInputDt() string {
 
-	var CurrentDt time.Time = time.Now()
-	var DefaultDt time.Time = CurrentDt.AddDate(0, -1, 0)
-	var DefaultDtStr string = DefaultDt.Format("2006-01")
+	var currentDt time.Time = time.Now()
+	var defaultDt time.Time = currentDt.AddDate(0, -1, 0)
+	var defaultDtStr string = defaultDt.Format("2006-01")
 
-	var InputDtStr string
+	var inputDtStr string
 	fmt.Println("Reporting Year Month in \"YYYY-mm\" format: ")
-	fmt.Printf("Or confirm default \"%v\" by ENTER.\n", DefaultDtStr)
-	fmt.Scanln(&InputDtStr)
+	fmt.Printf("Or confirm default \"%v\" by ENTER.\n", defaultDtStr)
+	fmt.Scanln(&inputDtStr)
 
-	if InputDtStr == "" {
-		InputDtStr = DefaultDtStr
+	if inputDtStr == "" {
+		inputDtStr = defaultDtStr
 	}
 
-	return InputDtStr
+	return inputDtStr
 
 }
 
-func GetFirstDayOfMonth(Dt time.Time) time.Time {
-	return time.Date(Dt.Year(), Dt.Month(), 1, 0, 0, 0, 0, time.UTC)
+func GetFirstDayOfMonth(dt time.Time) time.Time {
+	return time.Date(dt.Year(), dt.Month(), 1, 0, 0, 0, 0, time.UTC)
 }
 
-func GetFirstDayOfNextMonth(Dt time.Time) time.Time {
-	var NextMonthDt time.Time = Dt.AddDate(0, 1, 0) // works even for Jan and Dec
-	return time.Date(NextMonthDt.Year(), NextMonthDt.Month(), 1, 0, 0, 0, 0, time.UTC)
+func GetFirstDayOfNextMonth(dt time.Time) time.Time {
+	var nextMonthDt time.Time = dt.AddDate(0, 1, 0) // works even for Jan and Dec
+	return time.Date(nextMonthDt.Year(), nextMonthDt.Month(), 1, 0, 0, 0, 0, time.UTC)
 }
 
-func CreateExport(FromDt time.Time, ToDt time.Time) int {
+func CreateExport(fromDt time.Time, toDt time.Time) int {
 
 	const url string = "https://live.trading212.com/api/v0/history/exports"
 
-	DataIncluded := map[string]bool{
+	dataIncluded := map[string]bool{
 		"includeDividends":    true,
 		"includeInterest":     true,
 		"includeOrders":       true,
 		"includeTransactions": true,
 	}
 	
-	payloadData := Payload{
-		DataIncluded: DataIncluded,
-		TimeFrom: FromDt.Format(time.RFC3339),
-		TimeTo:   ToDt.Format(time.RFC3339),
+	payload := Payload{
+		DataIncluded: dataIncluded,
+		TimeFrom: fromDt.Format(time.RFC3339),
+		TimeTo:   toDt.Format(time.RFC3339),
 	}
 
-	payloadBytes, err := json.Marshal(payloadData)
+	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		panic(err)
 	}
@@ -106,13 +109,13 @@ func CreateExport(FromDt time.Time, ToDt time.Time) int {
 		panic(err)
 	}
 
-	var reponseData Export
-	err = json.Unmarshal(reponseBytes, &reponseData)
+	var reponseBody Export
+	err = json.Unmarshal(reponseBytes, &reponseBody)
 	if err != nil {
 		panic(err)
 	}
 
-	return reponseData.ReportId
+	return reponseBody.ReportId
 }
 
 func FetchReports() []Report {
@@ -142,19 +145,19 @@ func FetchReports() []Report {
 		panic(err)
 	}
 
-	var reponseData []Report
-	err = json.Unmarshal(responseBytes, &reponseData)
+	var reponseBody []Report
+	err = json.Unmarshal(responseBytes, &reponseBody)
 	if err != nil {
 		panic(err)
 	}
 
-	return reponseData
+	return reponseBody
 }
 
 
-func DownloadReport(DownloadLink string) string {
+func DownloadReport(downloadLink string) []byte {
 
-	req, err := http.NewRequest("GET", DownloadLink, nil)
+	req, err := http.NewRequest("GET", downloadLink, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -167,7 +170,7 @@ func DownloadReport(DownloadLink string) string {
 	fmt.Printf("  Response Status: %v\n", response.Status)
 
 	if response.Status != "200 OK" {
-		return ""
+		return nil
 	}
 
 	defer response.Body.Close()
@@ -176,15 +179,23 @@ func DownloadReport(DownloadLink string) string {
 		panic(err)
 	}
 
-	// var reponseData string
-	// err = json.Unmarshal(responseBytes, &reponseData)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	return string(responseBytes)
+	return responseBytes
 }
 
+// func Transform(){
+// 	// # Read input CSV
+//     // report_df = pd.read_csv(StringIO(df_bytes.decode('utf-8')))
+
+//     // # Filter out blacklisted tickers
+//     // report_df = report_df[~report_df['Ticker'].isin(TICKER_BLACKLIST)]
+//     // report_df = report_df[report_df['Action'].isin(['Market buy', 'Market sell'])]
+
+//     // # Apply the mapping to the ticker column
+//     // report_df['Ticker'] = report_df['Ticker'].apply(map_ticker)
+
+//     // # convert dtypes
+//     // return report_df.convert_dtypes()
+// }
 
 func main() {
 	err := godotenv.Load()
@@ -192,24 +203,27 @@ func main() {
 		panic(err)
 	}
 
-	var InputDtStr string = GetInputDt()
+	var inputDtStr string = GetInputDt()
 
-	var InputDt time.Time
-	InputDt, err = time.Parse("2006-01", InputDtStr)
-	if err != nil {
-		panic(err)
-	}
+	// var inputDt time.Time
+	// inputDt, err = time.Parse("2006-01", inputDtStr)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	var FromDt time.Time = GetFirstDayOfMonth(InputDt)
-	var ToDt time.Time = GetFirstDayOfNextMonth(InputDt)
+	// var fromDt time.Time = GetFirstDayOfMonth(inputDt)
+	// var toDt time.Time = GetFirstDayOfNextMonth(inputDt)
 
-	var CreatedReportId int
+	// fmt.Printf("  fromDt: %v\n", fromDt)
+	// fmt.Printf("  toDt: %v\n", toDt)
+
+	var createdReportId int
 
 	// for {
 		
-	// 	CreatedReportId = CreateExport(FromDt, ToDt)
+	// 	createdReportId = CreateExport(fromDt, toDt)
 
-	// 	if CreatedReportId != 0 {
+	// 	if createdReportId != 0 {
 	// 		break
 	// 	}
 
@@ -217,50 +231,62 @@ func main() {
 
 	// }
 	
-	// CreatedReportId Mock Up
-	CreatedReportId = 1594033
+	// createdReportId Mock Up
+	createdReportId = 1594033
 
-	fmt.Printf("  CreatedReportId: %v\n", CreatedReportId)
+	fmt.Printf("  createdReportId: %v\n", createdReportId)
 
-	var DownloadLink string
+	var downloadLink string
 
 	// for {
 
-	// 	var ReportsList []Report
-	// 	ReportsList = FetchReports()
+	// 	var reportsList []Report
+	// 	reportsList = FetchReports()
 
 	// 	// report list is empty
-	// 	if len(ReportsList) == 0 {
+	// 	if len(reportsList) == 0 {
 	// 		time.Sleep(60 * time.Second)
 	// 		continue
 	// 	}
 		
 	// 	// if report list is not empty
-	// 	var Report Report
+	// 	var report Report
 
 	// 	// reverse order for loop, cause latest export is expected to be at the end
-	// 	for i := len(ReportsList) - 1; i >= 0; i-- {
+	// 	for i := len(reportsList) - 1; i >= 0; i-- {
 
-	// 		if ReportsList[i].Id == CreatedReportId {
-	// 			Report = ReportsList[i]
+	// 		if reportsList[i].Id == CreatedReportId {
+	// 			report = reportsList[i]
 	// 			break
 	// 		}
 
 	// 	}
 
-	// 	if Report.Status == "Finished" {
-	// 		DownloadLink = Report.DownloadLink
+	// 	if report.Status == "Finished" {
+	// 		downloadLink = report.DownloadLink
 	// 		break
 	// 	}
 
 	// }
 
-	// DownloadLink Mock Up
-	DownloadLink = "https://tzswiy3zk5dms05cfeo.s3.eu-central-1.amazonaws.com/from_2025-03-01_to_2025-04-01_MTc0MzU4MDY0MDE0Mw.csv?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20250402T075723Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604799&X-Amz-Credential=AKIARJCCZCDEKCUWYOXG%2F20250402%2Feu-central-1%2Fs3%2Faws4_request&X-Amz-Signature=857a3b30cb532fdc0d52137a8af7602cbdfd84f597de0c74f61727403c71be3c"
+	// downloadLink Mock Up
+	downloadLink = "https://tzswiy3zk5dms05cfeo.s3.eu-central-1.amazonaws.com/from_2025-03-01_to_2025-04-01_MTc0MzU4MDY0MDE0Mw.csv?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20250402T075723Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604799&X-Amz-Credential=AKIARJCCZCDEKCUWYOXG%2F20250402%2Feu-central-1%2Fs3%2Faws4_request&X-Amz-Signature=857a3b30cb532fdc0d52137a8af7602cbdfd84f597de0c74f61727403c71be3c"
 
-	fmt.Printf("  DownloadLink: %v\n", DownloadLink)
+	fmt.Printf("  downloadLink: %v\n", downloadLink)
 
-	csv := DownloadReport(DownloadLink)
-	fmt.Printf("  csv: %v\n", csv)
+	var t212Bytes []byte
+	t212Bytes = DownloadReport(downloadLink)
+	fmt.Printf("  string(t212Bytes): %v\n", string(t212Bytes))
+
+	var keyName string
+
+	keyName = fmt.Sprintf("t212/%s.csv", inputDtStr)
+	awsutils.S3PutObject(t212Bytes, bucketName, keyName)
+
+	// digrin_df = transform(t212_df)
+    // digrin_df.to_csv(f'{input_dt_str}.csv')
+
+	keyName = fmt.Sprintf("digrin/%s.csv", inputDtStr)
+	awsutils.S3PutObject(t212Bytes, bucketName, keyName)
 
 }
