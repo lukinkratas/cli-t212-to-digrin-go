@@ -31,6 +31,25 @@ type Report struct {
 	DownloadLink string          `json:"downloadLink"`
 }
 
+func GetInputDt() string {
+
+	var CurrentDt time.Time = time.Now()
+	var DefaultDt time.Time = CurrentDt.AddDate(0, -1, 0)
+	var DefaultDtStr string = DefaultDt.Format("2006-01")
+
+	var InputDtStr string
+	fmt.Println("Reporting Year Month in \"YYYY-mm\" format: ")
+	fmt.Printf("Or confirm default \"%v\" by ENTER.\n", DefaultDtStr)
+	fmt.Scanln(&InputDtStr)
+
+	if InputDtStr == "" {
+		InputDtStr = DefaultDtStr
+	}
+
+	return InputDtStr
+
+}
+
 func GetFirstDayOfMonth(Dt time.Time) time.Time {
 	return time.Date(Dt.Year(), Dt.Month(), 1, 0, 0, 0, 0, time.UTC)
 }
@@ -133,17 +152,56 @@ func FetchReports() []Report {
 }
 
 
+func DownloadReport(DownloadLink string) string {
+
+	req, err := http.NewRequest("GET", DownloadLink, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("  Response Status: %v\n", response.Status)
+
+	if response.Status != "200 OK" {
+		return ""
+	}
+
+	defer response.Body.Close()
+	responseBytes, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	// var reponseData string
+	// err = json.Unmarshal(responseBytes, &reponseData)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	return string(responseBytes)
+}
+
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
 		panic(err)
 	}
 
-	// var CurrentDt time.Time = time.Now()
-	// var LastMonthDt time.Time = CurrentDt.AddDate(0, -1, 0)
-  
-	// var FromDt time.Time = GetFirstDayOfMonth(LastMonthDt)
-	// var ToDt time.Time = GetFirstDayOfNextMonth(LastMonthDt)
+	var InputDtStr string = GetInputDt()
+
+	var InputDt time.Time
+	InputDt, err = time.Parse("2006-01", InputDtStr)
+	if err != nil {
+		panic(err)
+	}
+
+	var FromDt time.Time = GetFirstDayOfMonth(InputDt)
+	var ToDt time.Time = GetFirstDayOfNextMonth(InputDt)
 
 	var CreatedReportId int
 
@@ -166,37 +224,43 @@ func main() {
 
 	var DownloadLink string
 
-	for {
+	// for {
 
-		var ReportsList []Report
-		ReportsList = FetchReports()
+	// 	var ReportsList []Report
+	// 	ReportsList = FetchReports()
 
-		// report list is empty
-		if len(ReportsList) == 0 {
-			time.Sleep(60 * time.Second)
-			continue
-		}
+	// 	// report list is empty
+	// 	if len(ReportsList) == 0 {
+	// 		time.Sleep(60 * time.Second)
+	// 		continue
+	// 	}
 		
-		// if report list is not empty
-		var Report Report
+	// 	// if report list is not empty
+	// 	var Report Report
 
-		// reverse order for loop, cause latest export is expected to be at the end
-		for i := len(ReportsList) - 1; i >= 0; i-- {
+	// 	// reverse order for loop, cause latest export is expected to be at the end
+	// 	for i := len(ReportsList) - 1; i >= 0; i-- {
 
-			if ReportsList[i].Id == CreatedReportId {
-				Report = ReportsList[i]
-				break
-			}
+	// 		if ReportsList[i].Id == CreatedReportId {
+	// 			Report = ReportsList[i]
+	// 			break
+	// 		}
 
-		}
+	// 	}
 
-		if Report.Status == "Finished" {
-			DownloadLink = Report.DownloadLink
-			break
-		}
+	// 	if Report.Status == "Finished" {
+	// 		DownloadLink = Report.DownloadLink
+	// 		break
+	// 	}
 
-	}
+	// }
+
+	// DownloadLink Mock Up
+	DownloadLink = "https://tzswiy3zk5dms05cfeo.s3.eu-central-1.amazonaws.com/from_2025-03-01_to_2025-04-01_MTc0MzU4MDY0MDE0Mw.csv?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20250402T075723Z&X-Amz-SignedHeaders=host&X-Amz-Expires=604799&X-Amz-Credential=AKIARJCCZCDEKCUWYOXG%2F20250402%2Feu-central-1%2Fs3%2Faws4_request&X-Amz-Signature=857a3b30cb532fdc0d52137a8af7602cbdfd84f597de0c74f61727403c71be3c"
 
 	fmt.Printf("  DownloadLink: %v\n", DownloadLink)
+
+	csv := DownloadReport(DownloadLink)
+	fmt.Printf("  csv: %v\n", csv)
 
 }
