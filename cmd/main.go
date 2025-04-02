@@ -10,7 +10,9 @@ import (
 	"encoding/json"
 
 	"github.com/joho/godotenv"
-	"github.com/lukinkratas/cli-t212-to-digrin-go/pkg/awsutils"
+	"github.com/aws/aws-sdk-go/aws"
+    "github.com/aws/aws-sdk-go/aws/session"
+    "github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
 const bucketName string = "t212-to-digrin"
@@ -182,6 +184,28 @@ func DownloadReport(downloadLink string) []byte {
 	return responseBytes
 }
 
+func S3PutObject(body []byte, bucket string, key string) {
+
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String(os.Getenv("AWS_REGION"))},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	s3uploader := s3manager.NewUploader(sess)
+
+	_, err = s3uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(bucket),
+		Key: aws.String(key),
+		Body: bytes.NewReader(body),
+	})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
 // func Transform(){
 // 	// # Read input CSV
 //     // report_df = pd.read_csv(StringIO(df_bytes.decode('utf-8')))
@@ -281,12 +305,12 @@ func main() {
 	var keyName string
 
 	keyName = fmt.Sprintf("t212/%s.csv", inputDtStr)
-	awsutils.S3PutObject(t212Bytes, bucketName, keyName)
+	S3PutObject(t212Bytes, bucketName, keyName)
 
 	// digrin_df = transform(t212_df)
     // digrin_df.to_csv(f'{input_dt_str}.csv')
 
 	keyName = fmt.Sprintf("digrin/%s.csv", inputDtStr)
-	awsutils.S3PutObject(t212Bytes, bucketName, keyName)
+	S3PutObject(t212Bytes, bucketName, keyName)
 
 }
