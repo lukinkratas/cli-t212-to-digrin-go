@@ -289,20 +289,19 @@ func main() {
 
 	fmt.Printf("  downloadLink: %v\n", downloadLink)
 
-	var t212Bytes []byte
-	t212Bytes = DownloadReport(downloadLink)
-	// fmt.Printf("  string(t212Bytes): %v\n", string(t212Bytes))
+	var t212BytesEncoded []byte
+	t212BytesEncoded = DownloadReport(downloadLink)
 
 	var fileName string
 	fileName = fmt.Sprintf("%s.csv", inputDtStr)
 
 	var keyName string
 	keyName = fmt.Sprintf("t212/%s", fileName)
-	utils.S3PutObject(t212Bytes, bucketName, keyName)
+	utils.S3PutObject(t212BytesEncoded, bucketName, keyName)
 
 	// Read the CSV file into a slice of Record structs
 	var csvRows []CsvRow
-	err = gocsv.UnmarshalBytes(t212Bytes, &csvRows)
+	err = gocsv.UnmarshalBytes(t212BytesEncoded, &csvRows)
 	if err != nil {
 		panic(err)
 	}
@@ -340,7 +339,7 @@ func main() {
         "NDIA": "NDIA.L",
 	}
 
-	for idx, csvRow := range csvRows {
+	for _, csvRow := range csvRows {
 
 		tickerSubstitute, ok := tickerMap[csvRow.Ticker]
 		if ok {
@@ -362,6 +361,11 @@ func main() {
 	}
 
 	keyName = fmt.Sprintf("digrin/%s", fileName)
-	utils.S3PutObject(t212Bytes, bucketName, keyName)
+	var digrinBytesEncoded []byte
+	digrinBytesEncoded, err = gocsv.MarshalBytes(csvRows)
+	if err != nil {
+		panic(err)
+	}
+	utils.S3PutObject(digrinBytesEncoded, bucketName, keyName)
 
 }

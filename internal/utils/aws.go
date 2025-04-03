@@ -10,7 +10,7 @@ import (
 )
 
 
-func S3PutObject(body []byte, bucket string, key string) {
+func S3PutObject(bytesEncoded []byte, bucket string, key string) {
 
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(os.Getenv("AWS_REGION"))},
@@ -24,7 +24,7 @@ func S3PutObject(body []byte, bucket string, key string) {
 	_, err = s3uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String(bucket),
 		Key: aws.String(key),
-		Body: bytes.NewReader(body),
+		Body: bytes.NewReader(bytesEncoded),
 	})
 	if err != nil {
 		panic(err)
