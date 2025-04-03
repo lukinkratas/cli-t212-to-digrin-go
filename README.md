@@ -16,3 +16,5 @@ go run main.py
 ```
 
 # TODO
+
+- [ ] investigate option of go routines

@@ -8,7 +8,7 @@ import (
 	"os"
 	"bytes"
 	"strings"
-	// "slices"
+	"slices"
 	"encoding/json"
 	"encoding/csv"
 
@@ -214,22 +214,6 @@ func DownloadReport(downloadLink string) []byte {
 	return responseBytes
 }
 
-
-// func Transform(){
-// 	// # Read input CSV
-//     // report_df = pd.read_csv(StringIO(df_bytes.decode('utf-8')))
-
-//     // # Filter out blacklisted tickers
-//     // report_df = report_df[~report_df['Ticker'].isin(TICKER_BLACKLIST)]
-//     // report_df = report_df[report_df['Action'].isin(['Market buy', 'Market sell'])]
-
-//     // # Apply the mapping to the ticker column
-//     // report_df['Ticker'] = report_df['Ticker'].apply(map_ticker)
-
-//     // # convert dtypes
-//     // return report_df.convert_dtypes()
-// }
-
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -324,11 +308,46 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
- 
-	// Print the records
+	
+	// Filter out blacklisted tickers
+	tickerBlacklist := []string{
+		"VNTRF",  // due to stock split
+		"BRK.A",  // not available in digrin
+	}
+	
+    csvRows = slices.DeleteFunc(csvRows, func(csvRow CsvRow) bool {
+		return slices.Contains(tickerBlacklist, csvRow.Ticker)
+    })
+	
+	// Filter only buys and sells
+	allowedActions := []string{"Market buy", "Market sell"}
+	
+    csvRows = slices.DeleteFunc(csvRows, func(csvRow CsvRow) bool {
+        return !slices.Contains(allowedActions, csvRow.Action)
+    })
+
 	for idx, csvRow := range csvRows {
 		fmt.Printf("  gocsv %v %v\n", idx, csvRow)
 	}
+
+	tickerMap := map[string]string{
+		"VWCE": "VWCE.DE",
+		"VUAA": "VUAA.DE",
+        "VUAA": "VUAA.DE",
+        "SXRV": "SXRV.DE",
+        "ZPRV": "ZPRV.DE",
+        "ZPRX": "ZPRX.DE",
+        "MC":   "MC.PA",
+        "ASML": "ASML.AS",
+        "CSPX": "CSPX.L",
+        "EISU": "EISU.L",
+        "IITU": "IITU.L",
+        "IUHC": "IUHC.L",
+        "NDIA": "NDIA.L",
+	}
+
+	// # Apply the mapping to the ticker column
+    // report_df['Ticker'] = report_df['Ticker'].apply(map_ticker)
 
 	// Write the CSV data locally
 	csvFile, err := os.Create(fileName)
