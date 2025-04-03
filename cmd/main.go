@@ -37,7 +37,7 @@ type Report struct {
 }
 
 
-type CsvRow struct {
+type CsvRecord struct {
 	Action                               string `csv:"Action"`
 	Time                                 string `csv:"Time"`
 	ISIN                                 string `csv:"ISIN"`
@@ -109,12 +109,12 @@ func CreateExport(fromDt time.Time, toDt time.Time) int {
 		TimeTo:   toDt.Format(time.RFC3339),
 	}
 
-	payloadBytes, err := json.Marshal(payload)
+	payloadEncoded, err := json.Marshal(payload)
 	if err != nil {
 		panic(err)
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadEncoded))
 	if err != nil {
 		panic(err)
 	}
@@ -134,13 +134,13 @@ func CreateExport(fromDt time.Time, toDt time.Time) int {
 	}
 	
 	defer response.Body.Close()
-	reponseBytes, err := ioutil.ReadAll(response.Body)
+	reponseEncoded, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		panic(err)
 	}
 
 	var reponseBody Export
-	err = json.Unmarshal(reponseBytes, &reponseBody)
+	err = json.Unmarshal(reponseEncoded, &reponseBody)
 	if err != nil {
 		panic(err)
 	}
@@ -170,13 +170,13 @@ func FetchReports() []Report {
 	}
 
 	defer response.Body.Close()
-	responseBytes, err := ioutil.ReadAll(response.Body)
+	responseEncoded, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		panic(err)
 	}
 
 	var reponseBody []Report
-	err = json.Unmarshal(responseBytes, &reponseBody)
+	err = json.Unmarshal(responseEncoded, &reponseBody)
 	if err != nil {
 		panic(err)
 	}
@@ -204,12 +204,12 @@ func DownloadReport(downloadLink string) []byte {
 	}
 
 	defer response.Body.Close()
-	responseBytes, err := ioutil.ReadAll(response.Body)
+	responseEncoded, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		panic(err)
 	}
 
-	return responseBytes
+	return responseEncoded
 }
 
 func main() {
@@ -289,19 +289,19 @@ func main() {
 
 	fmt.Printf("  downloadLink: %v\n", downloadLink)
 
-	var t212BytesEncoded []byte
-	t212BytesEncoded = DownloadReport(downloadLink)
+	var t212CsvEncoded []byte
+	t212CsvEncoded = DownloadReport(downloadLink)
 
 	var fileName string
 	fileName = fmt.Sprintf("%s.csv", inputDtStr)
 
 	var keyName string
 	keyName = fmt.Sprintf("t212/%s", fileName)
-	utils.S3PutObject(t212BytesEncoded, bucketName, keyName)
+	utils.S3PutObject(t212CsvEncoded, bucketName, keyName)
 
-	// Read the CSV file into a slice of Record structs
-	var csvRows []CsvRow
-	err = gocsv.UnmarshalBytes(t212BytesEncoded, &csvRows)
+	// Read the CSV
+	var csvRecords []CsvRecord
+	err = gocsv.UnmarshalBytes(t212CsvEncoded, &csvRecords)
 	if err != nil {
 		panic(err)
 	}
@@ -312,15 +312,15 @@ func main() {
 		"BRK.A",  // not available in digrin
 	}
 	
-    csvRows = slices.DeleteFunc(csvRows, func(csvRow CsvRow) bool {
-		return slices.Contains(tickerBlacklist, csvRow.Ticker)
+    csvRecords = slices.DeleteFunc(csvRecords, func(csvRecord CsvRecord) bool {
+		return slices.Contains(tickerBlacklist, csvRecord.Ticker)
     })
 	
 	// Filter only buys and sells
 	allowedActions := []string{"Market buy", "Market sell"}
 	
-    csvRows = slices.DeleteFunc(csvRows, func(csvRow CsvRow) bool {
-        return !slices.Contains(allowedActions, csvRow.Action)
+    csvRecords = slices.DeleteFunc(csvRecords, func(csvRecord CsvRecord) bool {
+        return !slices.Contains(allowedActions, csvRecord.Action)
     })
 
 	// Apply the mapping to the ticker column
@@ -339,11 +339,11 @@ func main() {
         "NDIA": "NDIA.L",
 	}
 
-	for _, csvRow := range csvRows {
+	for _, csvRecord := range csvRecords {
 
-		tickerSubstitute, ok := tickerMap[csvRow.Ticker]
+		tickerSubstitute, ok := tickerMap[csvRecord.Ticker]
 		if ok {
-			csvRow.Ticker = tickerSubstitute
+			csvRecord.Ticker = tickerSubstitute
 		}
 
 	}
@@ -355,17 +355,17 @@ func main() {
 	}
 	defer csvFile.Close()
  
-	err = gocsv.MarshalFile(&csvRows, csvFile)
+	err = gocsv.MarshalFile(&csvRecords, csvFile)
 	if err != nil {
 		panic(err)
 	}
 
 	keyName = fmt.Sprintf("digrin/%s", fileName)
-	var digrinBytesEncoded []byte
-	digrinBytesEncoded, err = gocsv.MarshalBytes(csvRows)
+	var digrinCsvEncoded []byte
+	digrinCsvEncoded, err = gocsv.MarshalBytes(csvRecords)
 	if err != nil {
 		panic(err)
 	}
-	utils.S3PutObject(digrinBytesEncoded, bucketName, keyName)
+	utils.S3PutObject(digrinCsvEncoded, bucketName, keyName)
 
 }
