@@ -13,7 +13,7 @@ import (
 	"encoding/csv"
 
 	"github.com/joho/godotenv"
-	// "github.com/gocarina/gocsv"
+	"github.com/gocarina/gocsv"
 	utils "github.com/lukinkratas/cli-t212-to-digrin-go/internal/utils"
 )
 
@@ -309,7 +309,7 @@ func main() {
 
 	var t212Bytes []byte
 	t212Bytes = DownloadReport(downloadLink)
-	fmt.Printf("  string(t212Bytes): %v\n", string(t212Bytes))
+	// fmt.Printf("  string(t212Bytes): %v\n", string(t212Bytes))
 
 	var fileName string
 	fileName = fmt.Sprintf("%s.csv", inputDtStr)
@@ -318,15 +318,17 @@ func main() {
 	keyName = fmt.Sprintf("t212/%s", fileName)
 	utils.S3PutObject(t212Bytes, bucketName, keyName)
 
-	// file, err := os.Open("test.csv")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer file.Close()
-
-	// fmt.Printf("  file: %v\n", file)
-
-	// digrin_df = transform(t212_df)
+	// Read the CSV file into a slice of Record structs
+	var csvRows []CsvRow
+	err = gocsv.UnmarshalBytes(t212Bytes, &csvRows)
+	if err != nil {
+		panic(err)
+	}
+ 
+	// Print the records
+	for idx, csvRow := range csvRows {
+		fmt.Printf("  gocsv %v %v\n", idx, csvRow)
+	}
 
 	// Write the CSV data locally
 	csvFile, err := os.Create(fileName)
@@ -340,8 +342,7 @@ func main() {
 	
 	var rows []string
 	rows = strings.Split(string(t212Bytes), "\n")
-	for idx, row := range rows {
-		fmt.Printf("%v %v\n", idx, row)
+	for _, row := range rows {
 		writer.Write(strings.Split(row, ","))
 	}
 
