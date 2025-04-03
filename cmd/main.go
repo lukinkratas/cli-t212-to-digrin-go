@@ -10,9 +10,8 @@ import (
 	"encoding/json"
 
 	"github.com/joho/godotenv"
-	"github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/gocarina/gocsv"
+	awsUtils "github.com/lukinkratas/cli-t212-to-digrin-go/internal/utils/aws"
 )
 
 const bucketName string = "t212-to-digrin"
@@ -184,27 +183,31 @@ func DownloadReport(downloadLink string) []byte {
 	return responseBytes
 }
 
-func S3PutObject(body []byte, bucket string, key string) {
-
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(os.Getenv("AWS_REGION"))},
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	s3uploader := s3manager.NewUploader(sess)
-
-	_, err = s3uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(bucket),
-		Key: aws.String(key),
-		Body: bytes.NewReader(body),
-	})
-	if err != nil {
-		panic(err)
-	}
-
-}
+// Action                                        string[python]
+// Time                                          string[python]
+// ISIN                                          string[python]
+// Ticker                                        string[python]
+// Name                                          string[python]
+// Notes                                         string[python]
+// ID                                            string[python]
+// No. of shares                                        Float64
+// Price / share                                        Float64
+// Currency (Price / share)                      string[python]
+// Exchange rate                                 string[python]
+// Currency (Result)                             string[python]
+// Total                                                Float64
+// Currency (Total)                              string[python]
+// Withholding tax                                      Float64
+// Currency (Withholding tax)                    string[python]
+// Currency conversion from amount                      Float64
+// Currency (Currency conversion from amount)    string[python]
+// Currency conversion to amount                        Float64
+// Currency (Currency conversion to amount)      string[python]
+// Currency conversion fee                              Float64
+// Currency (Currency conversion fee)            string[python]
+// French transaction tax                               Float64
+// Currency (French transaction tax)             string[python]
+// dtype: object
 
 // func Transform(){
 // 	// # Read input CSV
@@ -305,12 +308,12 @@ func main() {
 	var keyName string
 
 	keyName = fmt.Sprintf("t212/%s.csv", inputDtStr)
-	S3PutObject(t212Bytes, bucketName, keyName)
+	awsUtils.S3PutObject(t212Bytes, bucketName, keyName)
 
 	// digrin_df = transform(t212_df)
     // digrin_df.to_csv(f'{input_dt_str}.csv')
 
 	keyName = fmt.Sprintf("digrin/%s.csv", inputDtStr)
-	S3PutObject(t212Bytes, bucketName, keyName)
+	awsUtils.S3PutObject(t212Bytes, bucketName, keyName)
 
 }
