@@ -7,10 +7,8 @@ import (
 	"io/ioutil"
 	"os"
 	"bytes"
-	"strings"
 	"slices"
 	"encoding/json"
-	"encoding/csv"
 
 	"github.com/joho/godotenv"
 	"github.com/gocarina/gocsv"
@@ -326,14 +324,10 @@ func main() {
         return !slices.Contains(allowedActions, csvRow.Action)
     })
 
-	for idx, csvRow := range csvRows {
-		fmt.Printf("  gocsv %v %v\n", idx, csvRow)
-	}
-
+	// Apply the mapping to the ticker column
 	tickerMap := map[string]string{
 		"VWCE": "VWCE.DE",
 		"VUAA": "VUAA.DE",
-        "VUAA": "VUAA.DE",
         "SXRV": "SXRV.DE",
         "ZPRV": "ZPRV.DE",
         "ZPRX": "ZPRX.DE",
@@ -346,8 +340,14 @@ func main() {
         "NDIA": "NDIA.L",
 	}
 
-	// # Apply the mapping to the ticker column
-    // report_df['Ticker'] = report_df['Ticker'].apply(map_ticker)
+	for idx, csvRow := range csvRows {
+
+		tickerSubstitute, ok := tickerMap[csvRow.Ticker]
+		if ok {
+			csvRow.Ticker = tickerSubstitute
+		}
+
+	}
 
 	// Write the CSV data locally
 	csvFile, err := os.Create(fileName)
@@ -356,13 +356,9 @@ func main() {
 	}
 	defer csvFile.Close()
  
-	writer := csv.NewWriter(csvFile)
-	defer writer.Flush()
-	
-	var rows []string
-	rows = strings.Split(string(t212Bytes), "\n")
-	for _, row := range rows {
-		writer.Write(strings.Split(row, ","))
+	err = gocsv.MarshalFile(&csvRows, csvFile)
+	if err != nil {
+		panic(err)
 	}
 
 	keyName = fmt.Sprintf("digrin/%s", fileName)
