@@ -212,6 +212,53 @@ func DownloadReport(downloadLink string) []byte {
 	return responseEncoded
 }
 
+func ProcessCsv(csvRecords []CsvRecord) []CsvRecord {
+
+	// Filter out blacklisted tickers
+	tickerBlacklist := []string{
+		"VNTRF",  // due to stock split
+		"BRK.A",  // not available in digrin
+	}
+	
+    csvRecords = slices.DeleteFunc(csvRecords, func(csvRecord CsvRecord) bool {
+		return slices.Contains(tickerBlacklist, csvRecord.Ticker)
+    })
+	
+	// Filter only buys and sells
+	allowedActions := []string{"Market buy", "Market sell"}
+	
+    csvRecords = slices.DeleteFunc(csvRecords, func(csvRecord CsvRecord) bool {
+        return !slices.Contains(allowedActions, csvRecord.Action)
+    })
+
+	// Apply the mapping to the ticker column
+	tickerMap := map[string]string{
+		"VWCE": "VWCE.DE",
+		"VUAA": "VUAA.DE",
+        "SXRV": "SXRV.DE",
+        "ZPRV": "ZPRV.DE",
+        "ZPRX": "ZPRX.DE",
+        "MC":   "MC.PA",
+        "ASML": "ASML.AS",
+        "CSPX": "CSPX.L",
+        "EISU": "EISU.L",
+        "IITU": "IITU.L",
+        "IUHC": "IUHC.L",
+        "NDIA": "NDIA.L",
+	}
+
+	for _, csvRecord := range csvRecords {
+
+		tickerSubstitute, ok := tickerMap[csvRecord.Ticker]
+		if ok {
+			csvRecord.Ticker = tickerSubstitute
+		}
+
+	}
+
+	return csvRecords
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -305,48 +352,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
-	// Filter out blacklisted tickers
-	tickerBlacklist := []string{
-		"VNTRF",  // due to stock split
-		"BRK.A",  // not available in digrin
-	}
-	
-    csvRecords = slices.DeleteFunc(csvRecords, func(csvRecord CsvRecord) bool {
-		return slices.Contains(tickerBlacklist, csvRecord.Ticker)
-    })
-	
-	// Filter only buys and sells
-	allowedActions := []string{"Market buy", "Market sell"}
-	
-    csvRecords = slices.DeleteFunc(csvRecords, func(csvRecord CsvRecord) bool {
-        return !slices.Contains(allowedActions, csvRecord.Action)
-    })
 
-	// Apply the mapping to the ticker column
-	tickerMap := map[string]string{
-		"VWCE": "VWCE.DE",
-		"VUAA": "VUAA.DE",
-        "SXRV": "SXRV.DE",
-        "ZPRV": "ZPRV.DE",
-        "ZPRX": "ZPRX.DE",
-        "MC":   "MC.PA",
-        "ASML": "ASML.AS",
-        "CSPX": "CSPX.L",
-        "EISU": "EISU.L",
-        "IITU": "IITU.L",
-        "IUHC": "IUHC.L",
-        "NDIA": "NDIA.L",
-	}
-
-	for _, csvRecord := range csvRecords {
-
-		tickerSubstitute, ok := tickerMap[csvRecord.Ticker]
-		if ok {
-			csvRecord.Ticker = tickerSubstitute
-		}
-
-	}
+	csvRecords = ProcessCsv(csvRecords)
 
 	// Write the CSV data locally
 	csvFile, err := os.Create(fileName)
