@@ -5,16 +5,19 @@ import (
 	"time"
 	"net/http"
 	"io/ioutil"
-	"bytes"
 	"os"
+	"bytes"
+	"strings"
+	// "slices"
 	"encoding/json"
+	"encoding/csv"
 
 	"github.com/joho/godotenv"
-	"github.com/gocarina/gocsv"
-	awsUtils "github.com/lukinkratas/cli-t212-to-digrin-go/internal/utils/aws"
+	// "github.com/gocarina/gocsv"
+	utils "github.com/lukinkratas/cli-t212-to-digrin-go/internal/utils"
 )
 
-const bucketName string = "t212-to-digrin"
+const bucketName string = "t212-to-digrin-test"
 
 type Payload struct {
 	DataIncluded map[string]bool `json:"dataIncluded"`
@@ -33,6 +36,34 @@ type Report struct {
 	DataIncluded map[string]bool `json:"dataIncluded"`
 	Status       string          `json:"status"`
 	DownloadLink string          `json:"downloadLink"`
+}
+
+
+type CsvRow struct {
+	Action                               string `csv:"Action"`
+	Time                                 string `csv:"Time"`
+	ISIN                                 string `csv:"ISIN"`
+	Ticker                               string `csv:"Ticker"`
+	Name                                 string `csv:"Name"`
+	Notes                                string `csv:"Notes"`
+	Id                                   string `csv:"ID"`
+	NoOfShares                           float64 `csv:"No. of shares"`
+	PricePerShare                        float64 `csv:"Price / share"`
+	CurrencyPricePerShare                string `csv:"Currency (Price / share)"`
+	ExchangeRate                         string `csv:"Exchange rate"`
+	CurrencyResult                       string `csv:"Currency (Result)"`
+	Total                                float64 `csv:"Total"`
+	CurrencyTotal                        string `csv:"Currency (Total)"`
+	WithholdingTax                       float64 `csv:"Withholding tax"`
+	CurrencyWithholdingTax               string `csv:"Currency (Withholding tax)"`
+	CurrencyConversionFromAmount         float64 `csv:"Currency conversion from amount"`
+	CurrencyCurrencyConversionFromAmount string `csv:"Currency (Currency conversion from amount)"`
+	CurrencyConversionToAmount           float64 `csv:"Currency conversion to amount"`
+	CurrencyCurrencyConversionToAmount   string `csv:"Currency (Currency conversion to amount)"`
+	CurrencyConversionFee                float64 `csv:"Currency conversion fee"`
+	CurrencyCurrencyConversionFee        string `csv:"Currency (Currency conversion fee)"`
+	FrenchTransactionTax                 float64 `csv:"French transaction tax"`
+	CurrencyFrenchTransactionTax         string `csv:"Currency (French transaction tax)"`
 }
 
 func GetInputDt() string {
@@ -183,31 +214,6 @@ func DownloadReport(downloadLink string) []byte {
 	return responseBytes
 }
 
-// Action                                        string[python]
-// Time                                          string[python]
-// ISIN                                          string[python]
-// Ticker                                        string[python]
-// Name                                          string[python]
-// Notes                                         string[python]
-// ID                                            string[python]
-// No. of shares                                        Float64
-// Price / share                                        Float64
-// Currency (Price / share)                      string[python]
-// Exchange rate                                 string[python]
-// Currency (Result)                             string[python]
-// Total                                                Float64
-// Currency (Total)                              string[python]
-// Withholding tax                                      Float64
-// Currency (Withholding tax)                    string[python]
-// Currency conversion from amount                      Float64
-// Currency (Currency conversion from amount)    string[python]
-// Currency conversion to amount                        Float64
-// Currency (Currency conversion to amount)      string[python]
-// Currency conversion fee                              Float64
-// Currency (Currency conversion fee)            string[python]
-// French transaction tax                               Float64
-// Currency (French transaction tax)             string[python]
-// dtype: object
 
 // func Transform(){
 // 	// # Read input CSV
@@ -277,13 +283,13 @@ func main() {
 	// 	}
 		
 	// 	// if report list is not empty
-	// 	var report Report
+	// 	var createdReport Report
 
 	// 	// reverse order for loop, cause latest export is expected to be at the end
-	// 	for i := len(reportsList) - 1; i >= 0; i-- {
+	// 	for report in slices.Reverse(reportsList) {
 
-	// 		if reportsList[i].Id == CreatedReportId {
-	// 			report = reportsList[i]
+	// 		if report.Id == createdReportId {
+	// 	        createdReport = report // is this needed?
 	// 			break
 	// 		}
 
@@ -305,15 +311,41 @@ func main() {
 	t212Bytes = DownloadReport(downloadLink)
 	fmt.Printf("  string(t212Bytes): %v\n", string(t212Bytes))
 
-	var keyName string
+	var fileName string
+	fileName = fmt.Sprintf("%s.csv", inputDtStr)
 
-	keyName = fmt.Sprintf("t212/%s.csv", inputDtStr)
-	awsUtils.S3PutObject(t212Bytes, bucketName, keyName)
+	var keyName string
+	keyName = fmt.Sprintf("t212/%s", fileName)
+	utils.S3PutObject(t212Bytes, bucketName, keyName)
+
+	// file, err := os.Open("test.csv")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// defer file.Close()
+
+	// fmt.Printf("  file: %v\n", file)
 
 	// digrin_df = transform(t212_df)
-    // digrin_df.to_csv(f'{input_dt_str}.csv')
 
-	keyName = fmt.Sprintf("digrin/%s.csv", inputDtStr)
-	awsUtils.S3PutObject(t212Bytes, bucketName, keyName)
+	// Write the CSV data locally
+	csvFile, err := os.Create(fileName)
+	if err != nil {
+		panic(err)
+	}
+	defer csvFile.Close()
+ 
+	writer := csv.NewWriter(csvFile)
+	defer writer.Flush()
+	
+	var rows []string
+	rows = strings.Split(string(t212Bytes), "\n")
+	for idx, row := range rows {
+		fmt.Printf("%v %v\n", idx, row)
+		writer.Write(strings.Split(row, ","))
+	}
+
+	keyName = fmt.Sprintf("digrin/%s", fileName)
+	utils.S3PutObject(t212Bytes, bucketName, keyName)
 
 }
