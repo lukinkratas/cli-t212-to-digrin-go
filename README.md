@@ -18,3 +18,7 @@ go run main.py
 # TODO
 
 - [ ] investigate option of go routines
+
+- [ ] add logging
+
+- [ ] add decorators or decorators like functionality
