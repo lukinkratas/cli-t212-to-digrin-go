@@ -64,7 +64,7 @@ func main() {
 			break
 		}
 
-		time.Sleep(30 * time.Second)
+		time.Sleep(10 * time.Second)
 
 	}
 	
@@ -72,9 +72,6 @@ func main() {
 	// createdReportId = 1594033
 
 	fmt.Printf("  createdReportId: %v\n", createdReportId)
-
-	// optimize for too early fetch_reports call -> report still processing
-    time.Sleep(10 * time.Second)
 
 	var downloadLink string
 
@@ -84,7 +81,7 @@ func main() {
 
 		// report list is empty
 		if len(reportsList) == 0 {
-			time.Sleep(60 * time.Second)
+			time.Sleep(10 * time.Second)
 			continue
 		}
 		
