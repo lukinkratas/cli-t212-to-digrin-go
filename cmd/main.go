@@ -14,16 +14,16 @@ import (
 func GetInputDt() string {
 
 	var currentDt time.Time = time.Now()
-	var defaultDt time.Time = currentDt.AddDate(0, -1, 0)
-	var defaultDtStr string = defaultDt.Format("2006-01")
+	var previousMonthDt time.Time = currentDt.AddDate(0, -1, 0)
+	var previousMonthDtStr string = previousMonthDt.Format("2006-01")
 
 	var inputDtStr string
 	fmt.Println("Reporting Year Month in \"YYYY-mm\" format: ")
-	fmt.Printf("Or confirm default \"%v\" by ENTER.\n", defaultDtStr)
+	fmt.Printf("Or confirm default \"%v\" by ENTER.\n", previousMonthDtStr)
 	fmt.Scanln(&inputDtStr)
 
 	if inputDtStr == "" {
-		inputDtStr = defaultDtStr
+		inputDtStr = previousMonthDtStr
 	}
 
 	return inputDtStr
