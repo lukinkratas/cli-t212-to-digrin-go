@@ -73,6 +73,9 @@ func main() {
 
 	fmt.Printf("  createdReportId: %v\n", createdReportId)
 
+	// optimized wait time for report creation
+    time.Sleep(10 * time.Second)
+
 	var downloadLink string
 
 	for {
